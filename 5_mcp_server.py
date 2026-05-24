@@ -33,7 +33,8 @@ def list_files_in_curr_dir() -> list[str]:
         )
     except FileNotFoundError:
         return [f"Error: current directory not found...?"]
-    
+
+# TODO: note about guardrails
 @mcp.tool()
 def read_file_in_curr_dir(filename: str) -> str:
     """

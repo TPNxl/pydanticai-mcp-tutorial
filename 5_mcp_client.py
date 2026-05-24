@@ -1,3 +1,5 @@
+# TODO: so why do we need MCPs?
+
 import logfire
 from pydantic_ai import Agent, ModelMessage
 from pydantic_ai.mcp import MCPToolset

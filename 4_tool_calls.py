@@ -25,6 +25,7 @@ agent = Agent(
 )
 
 # You can define tools like this
+# Note: compare LLM math to LLM guessing
 @agent.tool_plain
 def breit_wigner(mass: float, m0: float, gamma: float) -> float:
     """Evaluate the non-relativistic Breit-Wigner resonance function at a given mass.
@@ -39,14 +40,14 @@ def breit_wigner(mass: float, m0: float, gamma: float) -> float:
 # You can also define a tool like this
 agent.tool_plain(pdg_lookup)
 
-
+# Basic user-agent chat interface (autonomous agents with chained prompts can also do tool calls)
 if __name__ == '__main__':
     message_history: list[ModelMessage] = []
 
     print("Physics assistant. Type 'quit' to exit.\n")
 
     while True:
-        user_input = input("You: ").strip()
+        user_input = input("You: ").strip() # input(...) takes a line of user input from the terminal and returns it as a string
         if user_input.lower() in ('quit', 'exit', 'q'):
             break
         if not user_input:
