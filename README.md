@@ -1,3 +1,5 @@
+# Goals for this tutorial
+
 Get an API key, NOT a CLI from a real provider (solves ToS issues for work and integration issues)
 Install a venv/conda env
 Install dependencies
