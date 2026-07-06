@@ -4,18 +4,18 @@
 # Notice: each agent has its own system prompt and does not see the other agent's.
 # Despite being the same model, they argue from different perspectives based on their instructions.
 
-import logfire
 from pydantic_ai import Agent
-from pydantic_ai.messages import ModelMessage, ModelRequest, ModelResponse, SystemPromptPart, TextPart
+from pydantic_ai.capabilities import ReinjectSystemPrompt
+from pydantic_ai.messages import ModelMessage
 
-from utils import MODEL, pretty_print_history
+from utils.formatting import append_to_history, pretty_print_history, print_total_usage
+from utils.llm import MODEL, configure_logfire
 
-logfire.configure(send_to_logfire='if-token-present')
-logfire.instrument_pydantic_ai()
+configure_logfire()
 
-agent_A = Agent(MODEL, name="Agent A")
-agent_B = Agent(MODEL, name="Agent B")
-
+# Note: we use ReinjectSystemPrompt to ensure the agent always has a system prompt even when we remove it from the shared history
+agent_A = Agent(MODEL, name="Agent A", capabilities=[ReinjectSystemPrompt()])
+agent_B = Agent(MODEL, name="Agent B", capabilities=[ReinjectSystemPrompt()])
 
 def make_debate_prompt(food: str) -> str:
     return (
@@ -42,22 +42,17 @@ message_history: list[ModelMessage] = []
 
 def run_agent(agent: Agent, first_run: bool = False):
     result = agent.run_sync(
-        user_prompt="start the argument." if first_run else "continue the argument.",
+        user_prompt="start the argument." if first_run else "continue the argument, addressing the other agent's concerns.",
         message_history=message_history,
     )
-
-    for msg in result.new_messages():
-        if isinstance(msg, ModelRequest):
-            # Strip system prompts (agent-private); keep user prompts for conversation context
-            msg.parts = [p for p in msg.parts if not isinstance(p, SystemPromptPart)]
-            if msg.parts:
-                message_history.append(msg)
-        if isinstance(msg, ModelResponse):
-            for part in msg.parts:
-                if isinstance(part, TextPart) and not part.content.startswith(f"{agent.name}:"):
-                    part.content = f"{agent.name}: {part.content}"
-            message_history.append(msg)
-
+    # Note: we use a helper method here to ensure formatting is done correctly in the chat between multiple agents
+    # Alternatively a structured response object could also solve this by ensuring adherence
+    append_to_history(
+        message_history,
+        result.new_messages(),
+        strip_system_prompts=True,
+        agent_name=agent.name,
+    )
     return result.usage
 
 
@@ -70,12 +65,4 @@ if __name__ == '__main__':
     print("--- Debate transcript ---\n")
     pretty_print_history(message_history, show_user_prompts=False, label_agents=False)
 
-    total_input = sum(u.input_tokens or 0 for u in usages)
-    total_output = sum(u.output_tokens or 0 for u in usages)
-    total_requests = sum(u.requests or 0 for u in usages)
-
-    print("\n--- Total usage ---")
-    print(f"  Requests:      {total_requests}")
-    print(f"  Input tokens:  {total_input}")
-    print(f"  Output tokens: {total_output}")
-    print(f"  Total tokens:  {total_input + total_output}")
+    print_total_usage(usages)

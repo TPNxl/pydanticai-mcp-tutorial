@@ -8,14 +8,12 @@
 
 import sys
 
-import logfire
-from pydantic_ai import Agent
-from pydantic_ai.messages import ModelMessage
+from pydantic_ai import Agent, AgentRunResult
 
-from utils import MODEL, pretty_print_history
+from utils.formatting import pretty_print_history
+from utils.llm import MODEL, configure_logfire
 
-logfire.configure(send_to_logfire='if-token-present')
-logfire.instrument_pydantic_ai()
+configure_logfire()
 
 agent = Agent(MODEL, instructions=(
     "Answer with at most 1 sentence."
@@ -28,7 +26,11 @@ def system_prompt():
 # The differences:
 # Version 1: each call is independent — the agent has no memory of prior messages.
 # Version 2: message history is passed between calls, giving the agent full context.
-# However, both agents remember the system prompt, which is included in every call regardless of message history.
+
+# However, both agents remember the system prompt.
+# The system prompt is passed in when message_history in run_sync(...) is not populated, and is assumed to be in the history otherwise.
+# Notice why the version 2 agent remembers the system prompt:
+# the first run_sync() populates it and the all_messages() in the further run_sync()s carry it forward.
 
 def run_version_1():
     # Without message history: the second call has no memory of the first question.
@@ -39,22 +41,24 @@ def run_version_1():
     result = agent.run_sync('What question did I ask at the start?')
     print(result.output)
 
+    # No common message history to print here
 
 def run_version_2():
-    message_history: list[ModelMessage] = []
-
-    def run_and_update(message: str):
-        nonlocal message_history
-        result = agent.run_sync(message, message_history=message_history)
+    result = None
+    def run_and_update(message: str, result: AgentRunResult | None):
+        if result:
+            result = agent.run_sync(message, message_history=result.all_messages())
+        else:
+            result = agent.run_sync(message)
         print(result.output)
-        message_history.extend(result.new_messages())
+        return result
 
-    run_and_update('What\'s 1+1?')
-    run_and_update('What is the secret letter?')
-    run_and_update('What question did I ask at the start?')
+    result = run_and_update('What\'s 1+1?', None)
+    result = run_and_update('What is the secret letter?', result)
+    result = run_and_update('What question did I ask at the start?', result)
 
     print("\n--- Message history ---\n")
-    pretty_print_history(message_history)
+    pretty_print_history(result.all_messages())
 
 
 if __name__ == '__main__':

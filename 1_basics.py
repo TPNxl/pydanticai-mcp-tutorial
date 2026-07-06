@@ -1,13 +1,12 @@
 # Goal: Call the LLM from the Python file using the library
 # Make sure to 'export ANTHROPIC_API_KEY=your-api-key'
 
-import logfire
 from pydantic_ai import Agent
 
-from utils import MODEL, format_usage
+from utils.formatting import format_usage
+from utils.llm import MODEL, configure_logfire
 
-logfire.configure(send_to_logfire='if-token-present')
-logfire.instrument_pydantic_ai()
+configure_logfire()
 
 agent = Agent(MODEL)
 
